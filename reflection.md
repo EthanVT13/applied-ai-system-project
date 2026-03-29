@@ -7,11 +7,13 @@
 - Briefly describe your initial UML design.
 The user need to be able to add owner and pet information, add and manage tasks, create and view a schedule.
 - What classes did you include, and what responsibilities did you assign to each?
+I included four classes: Owner, Pet, Task, and Scheduler. Owner stores user info and manages a list of pets, Pet holds basic animal details, and Task represents a single care activity with a priority and duration. Scheduler is the central class that brings everything together, generating a daily plan and explaining its reasoning.
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+Yes, the design changed during implementation. The most notable addition was a pet field on Task so each task knows which pet it belongs to. We also added add_task() to Scheduler since there was previously no way to populate tasks before generating a schedule.
 
 ---
 
@@ -26,6 +28,7 @@ The user need to be able to add owner and pet information, add and manage tasks,
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+The scheduler greedily picks tasks by priority and stops when time runs out, which means a long low-priority task might get skipped even if shorter ones could have fit around it. For a pet care app this is fine — you'd always rather make sure meds and feeding happen before worrying about enrichment activities.
 
 ---
 

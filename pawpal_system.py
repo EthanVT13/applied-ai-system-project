@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import List, Optional
 
 
@@ -11,6 +12,9 @@ class Task:
     category: str        # e.g., "walk", "feeding", "meds"
     description: str = ""
     completed: bool = False
+    preferred_time: str = ""        # "HH:MM" format, e.g. "08:00"
+    recurrence: str = ""            # "", "daily", or "weekly"
+    due_date: Optional[date] = None
     pet: Optional[Pet] = field(default=None, repr=False)
 
     def is_high_priority(self) -> bool:
@@ -18,8 +22,26 @@ class Task:
         return self.priority >= 4
 
     def mark_complete(self) -> None:
-        """Mark this task as completed."""
+        """Mark this task complete and auto-schedule the next occurrence if recurring."""
         self.completed = True
+        if self.recurrence and self.pet:
+            base = self.due_date or date.today()
+            if self.recurrence == "daily":
+                next_due = base + timedelta(days=1)
+            elif self.recurrence == "weekly":
+                next_due = base + timedelta(weeks=1)
+            else:
+                return
+            self.pet.add_task(Task(
+                name=self.name,
+                duration_minutes=self.duration_minutes,
+                priority=self.priority,
+                category=self.category,
+                description=self.description,
+                preferred_time=self.preferred_time,
+                recurrence=self.recurrence,
+                due_date=next_due,
+            ))
 
 
 @dataclass
@@ -74,10 +96,34 @@ class Scheduler:
         """Assign a task to the given pet and register it in that pet's task list."""
         pet.add_task(task)
 
-    def generate_schedule(self) -> List[Task]:
-        """Return a priority-sorted list of tasks that fit within the owner's available time."""
-        pending = [t for t in self.owner.get_all_tasks() if not t.completed]
-        sorted_tasks = sorted(pending, key=lambda t: t.priority, reverse=True)
+    def sort_by_time(self, tasks: List[Task]) -> List[Task]:
+        """Sort tasks by preferred_time in HH:MM format; tasks with no time go last."""
+        return sorted(
+            tasks,
+            key=lambda t: t.preferred_time if t.preferred_time else "99:99"
+        )
+
+    def filter_tasks(
+        self,
+        pet_name: Optional[str] = None,
+        completed: Optional[bool] = None,
+    ) -> List[Task]:
+        """Return tasks filtered by pet name and/or completion status."""
+        tasks = self.owner.get_all_tasks()
+        if pet_name is not None:
+            tasks = [t for t in tasks if t.pet and t.pet.name == pet_name]
+        if completed is not None:
+            tasks = [t for t in tasks if t.completed == completed]
+        return tasks
+
+    def generate_schedule(self, pet_name: Optional[str] = None) -> List[Task]:
+        """Return a priority-sorted list of pending tasks that fit within the owner's available time."""
+        pending = self.filter_tasks(pet_name=pet_name, completed=False)
+        # Primary sort: priority descending; secondary sort: preferred_time ascending
+        sorted_tasks = sorted(
+            pending,
+            key=lambda t: (-t.priority, t.preferred_time if t.preferred_time else "99:99")
+        )
 
         schedule = []
         time_used = 0
@@ -90,9 +136,28 @@ class Scheduler:
 
         return schedule
 
-    def explain_plan(self) -> str:
+    def detect_conflicts(self) -> List[str]:
+        """Return a list of warning messages for tasks whose time windows overlap on the same pet."""
+        warnings = []
+        for pet in self.owner.pets:
+            timed = [t for t in pet.tasks if t.preferred_time and not t.completed]
+            for i, a in enumerate(timed):
+                for b in timed[i + 1:]:
+                    a_start = int(a.preferred_time[:2]) * 60 + int(a.preferred_time[3:])
+                    b_start = int(b.preferred_time[:2]) * 60 + int(b.preferred_time[3:])
+                    a_end = a_start + a.duration_minutes
+                    b_end = b_start + b.duration_minutes
+                    if a_start < b_end and b_start < a_end:
+                        warnings.append(
+                            f"CONFLICT [{pet.name}]: '{a.name}' ({a.preferred_time}, "
+                            f"{a.duration_minutes} min) overlaps '{b.name}' "
+                            f"({b.preferred_time}, {b.duration_minutes} min)"
+                        )
+        return warnings
+
+    def explain_plan(self, pet_name: Optional[str] = None) -> str:
         """Generate a human-readable summary of today's schedule for the owner."""
-        schedule = self.generate_schedule()
+        schedule = self.generate_schedule(pet_name=pet_name)
 
         if not schedule:
             return f"{self.owner.name} has no tasks scheduled for today."
@@ -105,11 +170,12 @@ class Scheduler:
         ]
 
         for i, task in enumerate(schedule, 1):
-            pet_name = task.pet.name if task.pet else "Unknown"
+            pet_name_label = task.pet.name if task.pet else "Unknown"
             priority_label = "HIGH" if task.is_high_priority() else "normal"
+            time_label = f" @ {task.preferred_time}" if task.preferred_time else ""
             lines.append(
-                f"  {i}. [{priority_label}] {task.name} for {pet_name}"
-                f" — {task.duration_minutes} min ({task.category})"
+                f"  {i}. [{priority_label}] {task.name} for {pet_name_label}"
+                f"{time_label} — {task.duration_minutes} min ({task.category})"
             )
             if task.description:
                 lines.append(f"     {task.description}")
