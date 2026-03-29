@@ -5,6 +5,7 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+The user need to be able to add owner and pet information, add and manage tasks, create and view a schedule.
 - What classes did you include, and what responsibilities did you assign to each?
 
 **b. Design changes**
