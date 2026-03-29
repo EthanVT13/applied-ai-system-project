@@ -34,6 +34,32 @@ PawPal+ goes beyond a simple task list with four algorithmic features:
 
 **Conflict detection** — `Scheduler.detect_conflicts()` compares every pair of timed, pending tasks for each pet. If two tasks' time windows overlap (`start_a < end_b and start_b < end_a`), it returns a plain-language warning string instead of crashing, so the app can surface it to the user gracefully.
 
+## Testing PawPal+
+
+### Run the test suite
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+### What the tests cover
+
+18 tests across 5 categories:
+
+| Category | Tests | Description |
+|---|---|---|
+| **Sorting** | 3 | Tasks return in chronological HH:MM order; untimed tasks go last; schedule respects priority descending |
+| **Recurrence** | 4 | Daily tasks spawn next occurrence with `due_date + 1 day`; weekly tasks use `+ 7 days`; non-recurring tasks don't spawn; new task inherits all properties |
+| **Conflict detection** | 4 | Overlapping windows flagged; same start time flagged; back-to-back tasks are not flagged; completed tasks are excluded from checks |
+| **Edge cases** | 4 | Empty pet returns no schedule; owner with no pets returns no schedule; tasks that exceed the time budget are dropped; filter by pet name returns correct subset |
+| **Core behaviors** | 3 | `mark_complete()` sets status; `add_task()` increments count; `filter_tasks(completed=True)` returns only done tasks |
+
+### Confidence level
+
+★★★★☆ (4/5)
+
+The core scheduling logic — priority sorting, time budgeting, recurrence, and conflict detection — is fully tested and all 18 tests pass. One star withheld because the Streamlit UI layer (`app.py`) and multi-pet conflict scenarios (tasks across different pets) are not yet covered by automated tests.
+
 ## Getting started
 
 ### Setup
