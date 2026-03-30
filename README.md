@@ -1,40 +1,46 @@
 # PawPal+ (Module 2 Project)
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+**PawPal+** is a Streamlit app that helps a pet owner plan and schedule daily care tasks for their pet(s) using smart prioritization, time-aware sorting, conflict detection, and recurring task automation.
 
-## Scenario
+## 📸 Demo
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+![alt text](image.png)
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+<a href="/course_images/ai110/pawpal_screenshot.png" target="_blank"><img src='/course_images/ai110/pawpal_screenshot.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+## Features
 
-## What you will build
+- **Priority-based scheduling** — Tasks are ranked 1–5. The `Scheduler` fills the owner's daily time budget with the highest-priority tasks first, then uses preferred time as a tiebreaker so nothing important gets dropped.
 
-Your final app should:
+- **Time-aware sorting** — Every task can carry an optional `preferred_time` in `HH:MM` format. `Scheduler.sort_by_time()` uses a lambda key to return tasks in chronological order, with untimed tasks pushed to the end.
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+- **Conflict warnings** — `Scheduler.detect_conflicts()` compares every pair of timed, pending tasks per pet. If two tasks' time windows overlap, the UI surfaces a plain-language warning *before* the schedule is generated, so the owner can fix the conflict first.
 
-## Smarter Scheduling
+- **Recurring tasks** — Tasks marked `"daily"` or `"weekly"` automatically spawn the next occurrence when marked complete. Python's `timedelta` calculates the exact next `due_date` — no manual re-entry needed.
 
-PawPal+ goes beyond a simple task list with four algorithmic features:
+- **Flexible filtering** — `Scheduler.filter_tasks(pet_name, completed)` lets the UI slice tasks by pet or status. Powers the "pending only" view and per-pet schedule breakdowns.
 
-**Time-aware sorting** — Tasks carry an optional `preferred_time` field in `HH:MM` format. `Scheduler.sort_by_time()` uses a lambda key to sort them chronologically, with untimed tasks pushed to the end. The main schedule uses priority as the primary sort and preferred time as a tiebreaker.
+- **Multi-pet support** — `Owner` holds a list of `Pet` objects, each with their own task list. The `Scheduler` aggregates across all pets for the full daily plan.
 
-**Flexible filtering** — `Scheduler.filter_tasks(pet_name, completed)` lets you slice the task list by pet or completion status (or both). This powers per-pet schedule views and the "pending only" display in the UI.
+## System Architecture
 
-**Recurring tasks** — `Task` accepts a `recurrence` field (`"daily"` or `"weekly"`). When `mark_complete()` is called on a recurring task, it automatically creates the next occurrence using Python's `timedelta` and appends it to the pet's task list — no manual re-entry needed.
+![UML Class Diagram](uml_final.png)
 
-**Conflict detection** — `Scheduler.detect_conflicts()` compares every pair of timed, pending tasks for each pet. If two tasks' time windows overlap (`start_a < end_b and start_b < end_a`), it returns a plain-language warning string instead of crashing, so the app can surface it to the user gracefully.
+## Getting started
 
-## Testing PawPal+
+### Setup
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Run the app
+
+```bash
+streamlit run app.py
+```
 
 ### Run the test suite
 
@@ -42,7 +48,7 @@ PawPal+ goes beyond a simple task list with four algorithmic features:
 python -m pytest tests/test_pawpal.py -v
 ```
 
-### What the tests cover
+## Testing PawPal+
 
 18 tests across 5 categories:
 
@@ -60,22 +66,20 @@ python -m pytest tests/test_pawpal.py -v
 
 The core scheduling logic — priority sorting, time budgeting, recurrence, and conflict detection — is fully tested and all 18 tests pass. One star withheld because the Streamlit UI layer (`app.py`) and multi-pet conflict scenarios (tasks across different pets) are not yet covered by automated tests.
 
-## Getting started
+## Smarter Scheduling — How it works
 
-### Setup
+**Time-aware sorting** — `Scheduler.sort_by_time()` uses a lambda key to sort HH:MM strings. Untimed tasks default to `"99:99"` so they always sink to the end.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+**Flexible filtering** — `Scheduler.filter_tasks(pet_name, completed)` lets you slice the task list by pet or completion status (or both).
 
-### Suggested workflow
+**Recurring tasks** — `Task.mark_complete()` checks `self.recurrence` and calls `pet.add_task()` with a new `Task` whose `due_date` is `base + timedelta(days=1)` or `timedelta(weeks=1)`.
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+**Conflict detection** — `Scheduler.detect_conflicts()` converts `HH:MM` to minutes-since-midnight and tests every task pair with `start_a < end_b and start_b < end_a`.
+
+## Scenario
+
+A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+
+- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
+- Consider constraints (time available, priority, owner preferences)
+- Produce a daily plan and explain why it chose that plan
