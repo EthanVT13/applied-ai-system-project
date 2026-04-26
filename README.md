@@ -2,6 +2,12 @@
 
 PawPal+ helps pet owners plan their day by combining a smart task scheduler with a RAG-powered AI advisor. You add your pets and care tasks, the scheduler builds an optimized daily plan, and when you have questions — "Is it safe to walk Buddy right after his pill?" — the AI answers using your actual schedule plus a curated pet care knowledge base.
 
+## Link to DEMO
+
+https://www.loom.com/share/d0b8ab8761b844c984d115bf7a806b86
+
+
+
 ---
 
 ## Original Project (Modules 1–3)
