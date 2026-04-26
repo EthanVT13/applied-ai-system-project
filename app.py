@@ -1,6 +1,7 @@
 from datetime import date
 import streamlit as st
 from pawpal_system import Owner, Pet, Task, Scheduler
+from ai_advisor import ask_advisor, build_schedule_summary
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -179,3 +180,81 @@ else:
             ])
         else:
             st.success("All tasks are complete!")
+
+# ---------------------------------------------------------------------------
+# Section 4: AI Advisor (RAG-powered)
+# ---------------------------------------------------------------------------
+st.divider()
+st.subheader("Ask PawPal AI")
+st.caption(
+    "Ask anything about your pet's schedule, medications, or care routine. "
+    "The AI retrieves relevant guidelines from its knowledge base before answering."
+)
+
+if st.session_state.scheduler is None:
+    st.info("Complete Owner & Pet Setup to enable the AI advisor.")
+else:
+    scheduler: Scheduler = st.session_state.scheduler
+    owner: Owner = st.session_state.owner
+
+    # Build schedule context string from the current state
+    pending_tasks = scheduler.filter_tasks(completed=False)
+    schedule_lines = [
+        f"{t.name} for {t.pet.name if t.pet else '?'} "
+        f"@ {t.preferred_time or 'no time'} "
+        f"({t.duration_minutes} min, priority {t.priority}, category: {t.category})"
+        for t in pending_tasks
+    ]
+    conflicts = scheduler.detect_conflicts()
+    schedule_context = build_schedule_summary(owner.name, schedule_lines, conflicts)
+
+    question = st.text_input(
+        "Your question",
+        placeholder="e.g. Is it safe to walk Buddy right after his breakfast?",
+    )
+
+    if st.button("Ask AI", type="primary"):
+        if not question.strip():
+            st.warning("Please enter a question.")
+        else:
+            with st.spinner("Retrieving guidelines and generating answer..."):
+                result = ask_advisor(question=question, schedule_context=schedule_context)
+
+            if result["error"]:
+                st.error(f"Error: {result['error']}")
+            else:
+                # Confidence badge
+                confidence = result.get("confidence", "UNKNOWN")
+                coverage = result.get("retrieval_coverage", 0.0)
+                badge_color = {"HIGH": "🟢", "MEDIUM": "🟡", "LOW": "🔴"}.get(confidence, "⚪")
+                col_ans, col_conf = st.columns([3, 1])
+                with col_ans:
+                    st.markdown("**AI Answer**")
+                with col_conf:
+                    st.caption(f"{badge_color} Confidence: **{confidence}**")
+
+                st.info(result["answer"])
+
+                meta_parts = []
+                if result["sources"]:
+                    meta_parts.append(
+                        "Sources: " + ", ".join(f"`{s}`" for s in result["sources"])
+                    )
+                meta_parts.append(f"Retrieval coverage: {coverage:.0%}")
+                st.caption(" · ".join(meta_parts))
+
+    with st.expander("How does the AI advisor work?"):
+        st.markdown(
+            """
+**Retrieval-Augmented Generation (RAG)** powers the AI advisor:
+
+1. Your question is matched against a local knowledge base of pet care guidelines
+   (`dogs.md`, `cats.md`, `medications.md`, `scheduling.md`).
+2. The most relevant paragraphs are retrieved using keyword-overlap scoring.
+3. Those passages — plus your current schedule — are sent to Claude as context.
+4. Claude generates an answer grounded in both your specific situation and
+   the retrieved guidelines, reducing hallucination.
+
+All queries are logged to `pawpal_ai.log` for auditability.
+            """
+        )

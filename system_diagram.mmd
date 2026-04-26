@@ -1,0 +1,106 @@
+flowchart TD
+    %% ── INPUT ──────────────────────────────────────────────────────────────
+    OWNER(["👤 Pet Owner"])
+
+    subgraph UI ["Streamlit UI  (app.py)"]
+        direction TB
+        UI_SETUP["Owner & Pet Setup\nname · time budget · species"]
+        UI_TASKS["Add Tasks\nname · priority · time · recurrence"]
+        UI_ASK["Ask PawPal AI\nfree-text question"]
+    end
+
+    OWNER -->|"enters info"| UI_SETUP
+    OWNER -->|"adds tasks"| UI_TASKS
+    OWNER -->|"types question"| UI_ASK
+
+    %% ── CORE SCHEDULER ─────────────────────────────────────────────────────
+    subgraph SCHED ["Core Scheduler  (pawpal_system.py)"]
+        direction TB
+        OBJ["Owner / Pet / Task\nobjects"]
+        SCH["Scheduler\ngenerate_schedule()\ndetect_conflicts()\nsort_by_time()"]
+        PLAN["Prioritized task list\n+ conflict warnings"]
+    end
+
+    UI_SETUP --> OBJ
+    UI_TASKS --> OBJ
+    OBJ --> SCH
+    SCH --> PLAN
+
+    %% ── RAG PIPELINE ────────────────────────────────────────────────────────
+    subgraph RAG ["RAG Retriever  (rag.py)"]
+        direction TB
+        LOAD["load_knowledge_base()\nloads & chunks .md files"]
+        SCORE["retrieve()\nkeyword-overlap scoring"]
+        CHUNKS["Top-k relevant\npassages + source labels"]
+    end
+
+    KB[("📂 knowledge_base/\ndogs.md\ncats.md\nmedications.md\nscheduling.md")]
+
+    KB --> LOAD
+    LOAD --> SCORE
+    UI_ASK -->|"question"| SCORE
+    SCORE --> CHUNKS
+
+    %% ── PROMPT BUILDER ──────────────────────────────────────────────────────
+    CTX["Prompt Builder\nbuild_schedule_summary()\n+ retrieved chunks\n+ owner's question"]
+
+    PLAN -->|"schedule context"| CTX
+    CHUNKS -->|"retrieved knowledge"| CTX
+
+    %% ── AI LAYER ────────────────────────────────────────────────────────────
+    subgraph AI ["AI Advisor  (ai_advisor.py)"]
+        direction TB
+        GUARD["Guardrail checks\nAPI key present?\nquestion non-empty?"]
+        CLAUDE["Claude API\nclaude-sonnet-4-6\nmax_tokens=600\nprompt caching ON"]
+        RESP["AI-generated answer\n+ source list"]
+    end
+
+    CTX --> GUARD
+    GUARD -->|"valid request"| CLAUDE
+    CLAUDE --> RESP
+
+    %% ── OUTPUT ──────────────────────────────────────────────────────────────
+    subgraph OUT ["Output  (Streamlit UI)"]
+        DISPLAY["Answer card\n+ sources consulted"]
+        SCHED_VIEW["Schedule view\ntask table · conflict alerts\nmetrics panel"]
+    end
+
+    RESP --> DISPLAY
+    PLAN --> SCHED_VIEW
+
+    DISPLAY -->|"reads & acts on advice"| OWNER
+    SCHED_VIEW -->|"reviews schedule"| OWNER
+
+    %% ── LOGGING & ERROR HANDLING ────────────────────────────────────────────
+    LOG[("📄 pawpal_ai.log\nquery · sources · tokens\nAPI errors")]
+    ERR["Error Handler\nAuthError · RateLimitError\nAPIStatusError"]
+
+    CLAUDE -->|"usage stats"| LOG
+    GUARD -->|"validation errors"| ERR
+    CLAUDE -->|"API exceptions"| ERR
+    ERR -->|"user-friendly message"| DISPLAY
+
+    %% ── TESTING ─────────────────────────────────────────────────────────────
+    subgraph TEST ["Automated Test Suite  (tests/)"]
+        direction LR
+        T1["Scheduler tests\npriority · conflicts\nrecurrence"]
+        T2["Pet & Task tests\nmark_complete()\nget_info()"]
+    end
+
+    TEST -.->|"validates"| SCHED
+    TEST -.->|"validates"| OBJ
+
+    %% ── STYLES ──────────────────────────────────────────────────────────────
+    classDef io      fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    classDef core    fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef rag     fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef ai      fill:#fae8ff,stroke:#a855f7,color:#3b0764
+    classDef store   fill:#f1f5f9,stroke:#64748b,color:#1e293b
+    classDef test    fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+
+    class OWNER,UI_SETUP,UI_TASKS,UI_ASK,DISPLAY,SCHED_VIEW io
+    class OBJ,SCH,PLAN core
+    class LOAD,SCORE,CHUNKS,CTX rag
+    class GUARD,CLAUDE,RESP,ERR ai
+    class KB,LOG store
+    class T1,T2 test
